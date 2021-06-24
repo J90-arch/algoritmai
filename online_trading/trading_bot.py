@@ -39,12 +39,7 @@ invest = True
 print("\033[93m {}\033[00m" .format("\n\n\tLogging in...\n"))
 
 def login(invest = True):
-<<<<<<< HEAD
-    global email, password
-    if Invest:
-=======
     if invest:
->>>>>>> 0a15f3776bb2f155644efadb5f2ceba3b9bf2f68
         trading = Invest(email, password, headless=False)# For practice account
     else:
         trading = CFD(email, password, headless=False) # For practice
