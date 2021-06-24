@@ -1,0 +1,8 @@
+.env
+__pycache__/
+testing_api/
+online_trading/__pycache__/
+geckodriver.log
+online_trading/geckodriver.log
+online_trading/log.txt
+log.txt
