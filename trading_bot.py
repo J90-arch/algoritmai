@@ -39,8 +39,7 @@ invest = True
 print("\033[93m {}\033[00m" .format("\n\n\tLogging in...\n"))
 
 def login(invest = True):
-    global email, password
-    if Invest:
+    if invest:
         trading = Invest(email, password, headless=False)# For practice account
     else:
         trading = CFD(email, password, headless=False) # For practice
@@ -49,7 +48,7 @@ def login(invest = True):
 
 
 try:
-    trading = login(Invest)
+    trading = login(invest)
     print("\033[92m {}\033[00m" .format("\tSuccesufuly logged in\n"))
 except selenium.common.exceptions.InvalidSessionIdException:
     print("\033[91m {}\033[00m" .format("\tTime out, did not log in"))
@@ -72,23 +71,37 @@ def buy(stock, amount):
     except:
         print("Exception, relogging in")
         trading.close()
-        trading = login(Invest)
+        trading = login(invest)
         trading.buy_stock(stock, amount)
 
 
-def sell(stock, amount):
+def close(stock, amount):
     global trading
-    print (f"selling all stocks (only simulated)")
+    print (f"closing position (only simulated)")
     with open("log.txt", "a") as f:
-        f.write(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + f' Sold {amount} of {stock}\n')
+        f.write(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + f' Closed position {amount} of {stock}\n')
     try:
         trading.close_position(stock)
     except:
         print("Exception, relogging in")
         trading.close()
-        trading = login(Invest)
+        trading = login(invest)
         trading.close_position(stock)
 
+
+if not invest:
+    def shortsell(stock, amount):
+        global trading
+        print (f"borrowing {amount} stocks (only simulated)")
+        with open("log.txt", "a") as f:
+            f.write(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + f' Borrowed {amount} of {stock}\n')
+        try:    
+            trading.sell_stock(stock, amount)
+        except:
+            print("Exception, relogging in")
+            trading.close()
+            trading = login(invest)
+            trading.sell_stock(stock, amount)
 
 def has_stock(stock):
     global open_position_num
@@ -131,9 +144,13 @@ def algo_decision(): # decides whether to buy or to sell the shares it has and h
         max_transaction_sum = get_max_transaction_sum(stock_price)
 
         print(f'algo {algo_ans}, portfolio {portfolio_state}')
-
-        if algo_ans and not portfolio_state: # if algo outputs True (price should go up)
+        # algo = should price go up in the future?
+        # portfolio_state = did price go up in the past?
+        # shortselling = is bot currently shortselling?
+        if algo_ans and not portfolio_state:  
             portfolio_state = True
+            #if shortselling:
+            #    close(stock, amount)
             amount = free_cash // stock_price
             if amount * stock_price > max_transaction_sum:
                 amount = max_transaction_sum // stock_price
@@ -163,7 +180,7 @@ def algo_decision(): # decides whether to buy or to sell the shares it has and h
                 if amount * stock_price > max_transaction_sum:
                     amount = max_transaction_sum // stock_price
                 free_cash += amount * stock_price
-                sell(stock, amount)
+                close(stock, amount)
                 dotenv.set_key('.env', "OPEN_POSITION_NUM", "0")
                 open_position_num = 0
 
