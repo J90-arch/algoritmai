@@ -6,7 +6,7 @@ To use this create .env file in online_trading/ with your configuration
 
 I am not responsible for anything that happens to your account, since AI is not very accurate currently.
 
-A few other github repositories were used and I will credit them
+A few other github repositories were used:
 
 Trading 212 api:
 https://github.com/BenTimor/Trading212API
