@@ -12,7 +12,7 @@ Trading 212 api:
 https://github.com/BenTimor/Trading212API
 
 AI:
-(I forgot, I'll include this latter)
+https://github.com/nown-creation/codes/tree/d115955b98c5ca5aa5b7108f5ff28aa70253572a/machine-learning/stock-prediction
 
 
 to do:
