@@ -30,6 +30,10 @@ open_position_num = int(float(os.getenv("OPEN_POSITION_NUM"))) # how many shares
 email = os.getenv("EMAIL")
 password = os.getenv("PASSWORD")
 
+Trailing_loss = False
+cashout_top = 1.2
+cashout_down = 0.9
+
 ### Enabled if using relative price change
 #predicted_price_main = si.get_live_price(stock_short_name)
 #was price rising
@@ -75,11 +79,12 @@ def buy(stock, amount):
         trading.buy_stock(stock, amount)
 
 
-def close(stock, amount):
+def close(stock, amount, ratio, stock_price):
     global trading
+    global curr
     print (f"closing position (only simulated)")
     with open("log.txt", "a") as f:
-        f.write(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + f' Closed position {amount} of {stock}\n')
+        f.write(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + f' Closed position {amount} of {stock}, profit {(ratio-1)*amount*stock_price}\n')
     try:
         trading.close_position(stock)
     except:
@@ -128,7 +133,8 @@ def get_max_transaction_sum(stock_price):
     max_transaction_sum = parameter_max_transaction_sum * portfolio_value
     return max_transaction_sum
 
-
+prev_price = get_stock_price(stock_short_name)
+old_price = prev_price
 def algo_decision(): # decides whether to buy or to sell the shares it has and how many
     global portfolio_value # just for testing
     global stock
@@ -136,18 +142,27 @@ def algo_decision(): # decides whether to buy or to sell the shares it has and h
     global free_cash
     global open_position_num
     global portfolio_state
-
+    global old_price
+    global prev_price
+    global Trailing_loss
     if is_open(): # checks whether or not regular market is open
-        algo_ans = AI_prediction() # algorithm output
-        algo_ans = algo_ans[0]
-        stock_price = get_stock_price(stock_short_name)
+        algo_ans, _ , stock_price = AI_prediction()
+        #algo_ans = AI_prediction() # algorithm output
+        #algo_ans = algo_ans[0]
+        #stock_price = get_stock_price(stock_short_name)
         max_transaction_sum = get_max_transaction_sum(stock_price)
+        if Trailing_loss:
+            ratio = stock_price / prev_price
+            prev_price = stock_price
+        else:
+            ratio = stock_price / old_price
 
-        print(f'algo {algo_ans}, portfolio {portfolio_state}')
+        print(f'{algo_ans = } {portfolio_state = }')
         # algo = should price go up in the future?
         # portfolio_state = did price go up in the past?
         # shortselling = is bot currently shortselling?
         if algo_ans and not portfolio_state:  
+            old_price = stock_price
             portfolio_state = True
             #if shortselling:
             #    close(stock, amount)
@@ -173,14 +188,14 @@ def algo_decision(): # decides whether to buy or to sell the shares it has and h
             #         f.close()
             
 
-        elif portfolio_state and not algo_ans: # if algo outputs False (price should go down)
+        elif (portfolio_state and not algo_ans) or (ratio >= cashout_top or ratio <= cashout_down): # if algo outputs False (price should go down)
             portfolio_state = False
             if has_stock(stock):
                 amount = open_position_num
                 if amount * stock_price > max_transaction_sum:
                     amount = max_transaction_sum // stock_price
                 free_cash += amount * stock_price
-                close(stock, amount)
+                close(stock, amount, ratio, stock_price)
                 dotenv.set_key('.env', "OPEN_POSITION_NUM", "0")
                 open_position_num = 0
 

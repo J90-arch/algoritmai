@@ -1,4 +1,6 @@
-import tensorflow as tf
+import os
+from dotenv import load_dotenv
+import numpy as np
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout, Bidirectional
 from sklearn import preprocessing
@@ -8,14 +10,20 @@ from collections import deque
 import datetime
 import numpy as np
 import pandas as pd
-import random
+import yfinance as yf
+from pandas_datareader import data as pdr
+#from parameters import *
 
-PATH = r"C:\Users\jokub\Desktop\algoritmai\data\SPY_2021-03-27.csv"
+yf.pdr_override()
 
-# set seed, so we can get the same results after rerunning several times
-np.random.seed(314)
-tf.random.set_seed(314)
-random.seed(314)
+N_STEPS = 15
+n_steps = N_STEPS
+FEATURE_COLUMNS = ['open', 'high', 'low', 'close', 'volume']
+SCALE = True
+print("\033[96m {}\033[00m" .format("\n\tPREPARING AI\n"))
+
+load_dotenv()
+stock_short_name = os.getenv("STOCK_SHORT_NAME")
 
 
 def shuffle_in_unison(a, b):
@@ -26,8 +34,25 @@ def shuffle_in_unison(a, b):
     np.random.shuffle(b)
 
 
-def load_data(ticker, n_steps=50, scale=True, shuffle=True, lookup_step=1, split_by_date=True,
-                test_size=0.2, feature_columns=['open', 'high', 'low', 'close', 'volume']):
+def predict(model, data):
+    # retrieve the last sequence from data
+    last_sequence = data["last_sequence"][-N_STEPS:]
+    # expand dimension
+    last_sequence = np.expand_dims(last_sequence, axis=0)
+    # get the prediction (scaled from 0 to 1)
+    prediction = model.predict(last_sequence)
+    # get the price (by inverting the scaling)
+    if SCALE:
+        predicted_price = data["column_scaler"]["close"].inverse_transform(prediction)[0][0]
+    #changed adj
+    else:
+        predicted_price = prediction[0][0]
+    return predicted_price
+
+
+#!!!reiketu sita sutvarkyt
+def load_data(ticker, n_steps=N_STEPS, scale=True, shuffle=False, lookup_step=1, split_by_date=True,
+                test_size=0, feature_columns=FEATURE_COLUMNS):
     """
     Loads data from Yahoo Finance source, as well as scaling, shuffling, normalizing and splitting.
     Params:
@@ -42,19 +67,30 @@ def load_data(ticker, n_steps=50, scale=True, shuffle=True, lookup_step=1, split
         feature_columns (list): the list of features to use to feed into the model, default is everything grabbed from yahoo_fin
     """
     # see if ticker is already a loaded stock from yahoo finance
-    '''
     if isinstance(ticker, str):
         # load it from yahoo_fin library
-        today = datetime.date.today()
-        yesterday = today - datetime.timedelta(days=1)
-        yesterday = datetime.datetime.strptime(str(yesterday), '%Y-%m-%d').strftime('%m/%d/%y')
-        df = si.get_data(ticker, start_date=str(yesterday), interval='1m')
+        
+        #today = datetime.date.today()
+        #yesterday = today - datetime.timedelta(days=1)
+        #yesterday = datetime.datetime.strptime(str(yesterday), '%Y-%m-%d').strftime('%m/%d/%y')
+        df = yf.Ticker(ticker).history(period='15m', interval='1m')[['Open', 'High', 'Low', 'Close', 'Volume']]
+        df.index = df.index.tz_localize(None)
+        df.columns = FEATURE_COLUMNS
+        df.to_csv('tmp.csv')
+        with open('tmp.csv', 'r', encoding='utf-8') as F:
+            tmp_df = F.readlines()
+        tmp_df[0] = tmp_df[0][8:]
+        print(tmp_df)
+        with open('tmp.csv', 'w', encoding='utf-8') as F:
+            F.writelines(tmp_df)
+        df = pd.read_csv('tmp.csv')
+
+        print("\033[91m {}\033[00m" .format(df.columns))
     elif isinstance(ticker, pd.DataFrame):
         # already loaded, use it directly
         df = ticker
     else:
         raise TypeError("ticker can be either a str or a `pd.DataFrame` instances")
-    '''
     df.to_csv('yahoo.csv', sep=',', encoding='utf-8')
     #2 df = pd.read_csv(PATH)
     # this will contain all the elements we want to return from this function
@@ -133,6 +169,8 @@ def load_data(ticker, n_steps=50, scale=True, shuffle=True, lookup_step=1, split
         result["X_train"], result["X_test"], result["y_train"], result["y_test"] = train_test_split(X, y, test_size=test_size, shuffle=shuffle)
 
     # get the list of test set dates
+    print("\n\n\n\n")
+    print(sequence_data)
     dates = result["X_test"][:, -1, -1]
     # retrieve test features from the original dataframe
     result["test_df"] = result["df"].loc[dates]
@@ -173,5 +211,31 @@ def create_model(sequence_length, n_features, units=256, cell=LSTM, n_layers=2, 
     model.compile(loss=loss, metrics=["mean_absolute_error"], optimizer=optimizer)
     return model
 
+# construct the model
+model = create_model(sequence_length=N_STEPS, n_features=len(FEATURE_COLUMNS))
+# load optimal model weights from results folder
+model.load_weights("SPY-sh-1-sc-1-sbd-0-huber_loss-adam-LSTM-seq-50-step-15-layers-2-units-256.h5")
+'''
+try:
+    model.load_weights(r"SPY-sh-1-sc-1-sbd-0-huber_loss-adam-LSTM-seq-50-step-15-layers-2-units-256.h5")
+except:
+    model.load_weights(r"results\SPY-sh-1-sc-1-sbd-0-huber_loss-adam-LSTM-seq-50-step-15-layers-2-units-256.h5")
+'''
+#def AI_prediction(stock_short_name = stock_short_name, model=model):
+def AI_prediction(stock_short_name = stock_short_name, model=model):
+    current_price = si.get_live_price(stock_short_name)
 
+    data = load_data(stock_short_name)
 
+    future_price = predict(model, data)
+
+    delta = future_price-current_price
+    #delta = future_price-predicted_price
+    print(f'future price {future_price}, current price {current_price}, delta {delta}')
+    
+    if delta > 0:
+        return True , future_price
+    elif delta < 0:
+        return False , future_price
+    elif delta == 0:
+        return '0' , future_price

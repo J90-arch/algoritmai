@@ -198,7 +198,7 @@ model = create_model(sequence_length=N_STEPS, n_features=len(FEATURE_COLUMNS))
 try:
     model.load_weights(r"online_trading\results\SPY-sh-1-sc-1-sbd-0-huber_loss-adam-LSTM-seq-50-step-15-layers-2-units-256.h5")
 except:
-    model.load_weights(r"results\SPY-sh-1-sc-1-sbd-0-huber_loss-adam-LSTM-seq-50-step-15-layers-2-units-256.h5")
+    model.load_weights(r"results/SPY-sh-1-sc-1-sbd-0-huber_loss-adam-LSTM-seq-50-step-15-layers-2-units-256.h5")
 
 #def AI_prediction(stock_short_name = stock_short_name, model=model):
 def AI_prediction(stock_short_name = stock_short_name, model=model):
@@ -213,8 +213,8 @@ def AI_prediction(stock_short_name = stock_short_name, model=model):
     print(f'future price {future_price}, current price {current_price}, delta {delta}')
     
     if delta > 0:
-        return True , future_price
+        return True , future_price , current_price
     elif delta < 0:
-        return False , future_price
+        return False , future_price , current_price
     elif delta == 0:
-        return '0' , future_price
+        return '0' , future_price , current_price
